@@ -1,0 +1,25 @@
+# 生成的产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 本工具自己的输出目录（报表 / 归档 / 台账）
+_报表/
+_归档/
+_archive/
+_reports/
+samples/_报表/
+samples/_归档/
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+.DS_Store

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice>
+  <InvoiceNumber>25117000000000000003</InvoiceNumber>
+  <IssueDate>2026-09-05</IssueDate>
+  <InvoiceType>电子发票（普通发票）</InvoiceType>
+  <BuyerName>测试用科技有限公司</BuyerName>
+  <BuyerTaxID>91330100MA2TETX11W</BuyerTaxID>
+  <SellerName>示例网络科技有限公司</SellerName>
+  <SellerTaxID>91110108MA0DEM09Y6</SellerTaxID>
+  <TotalAmount>300.00</TotalAmount>
+  <TotalTax>18.00</TotalTax>
+  <TotalAmountWithTax>318.00</TotalAmountWithTax>
+  <TotalAmountWithTaxInWords>叁佰壹拾捌元整</TotalAmountWithTaxInWords>
+  <CheckCode>01234567890123456789</CheckCode>
+  <ItemName>*运输服务*客运服务费</ItemName>
+</Invoice>
