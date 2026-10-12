@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Optional
 
 from .models import Invoice
 from .validate import classify_invoice_number
@@ -38,7 +37,7 @@ def text_views(text: str) -> tuple[str, str, str]:
 _AMOUNT_RE = re.compile(r"[¥￥]?([0-9][0-9,]*\.[0-9]{2})")
 
 
-def to_decimal(value: str) -> Optional[Decimal]:
+def to_decimal(value: str) -> Decimal | None:
     """把 "1,234.56" / "¥1234.56" 之类转成 Decimal。"""
     if value is None:
         return None
@@ -52,8 +51,26 @@ def to_decimal(value: str) -> Optional[Decimal]:
 
 
 _CN_DIGITS = {
-    "零": 0, "壹": 1, "贰": 2, "叁": 3, "肆": 4, "伍": 5, "陆": 6, "柒": 7, "捌": 8, "玖": 9,
-    "〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9,
+    "零": 0,
+    "壹": 1,
+    "贰": 2,
+    "叁": 3,
+    "肆": 4,
+    "伍": 5,
+    "陆": 6,
+    "柒": 7,
+    "捌": 8,
+    "玖": 9,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
 }
 _CN_UNITS = {"拾": 10, "十": 10, "佰": 100, "百": 100, "仟": 1000, "千": 1000}
 
@@ -84,7 +101,7 @@ def _parse_cn_int(seg: str) -> int:
     return total + _parse_simple(seg)
 
 
-def chinese_amount_to_decimal(text: str) -> Optional[Decimal]:
+def chinese_amount_to_decimal(text: str) -> Decimal | None:
     """把「壹仟贰佰叁拾肆元伍角陆分」这类大写金额转成 Decimal。
 
     用途：与小写金额交叉核对——两者不一致往往是发票被涂改的信号。
@@ -118,7 +135,12 @@ def chinese_amount_to_decimal(text: str) -> Optional[Decimal]:
     if m:
         fen = _CN_DIGITS[m.group(1)]
 
-    if int_value == 0 and jiao == 0 and fen == 0 and not re.search(r"[零壹贰叁肆伍陆柒捌玖〇一二三四五六七八九]", s):
+    if (
+        int_value == 0
+        and jiao == 0
+        and fen == 0
+        and not re.search(r"[零壹贰叁肆伍陆柒捌玖〇一二三四五六七八九]", s)
+    ):
         return None
     return (Decimal(int_value) + Decimal(jiao) / 10 + Decimal(fen) / 100).quantize(Decimal("0.01"))
 
@@ -135,9 +157,7 @@ RE_DATE_ISO = re.compile(r"开票日期[:：]?(\d{4})[-/.](\d{1,2})[-/.](\d{1,2}
 RE_DATE_COMPACT = re.compile(r"开票日期[:：]?(\d{4})(\d{2})(\d{2})")
 
 # 价税合计：数电票版式为「价税合计（大写）...（小写）¥123.45」
-RE_TOTAL_XIAOXIE = re.compile(
-    r"价税合计.{0,40}?[（(]小写[)）][¥￥]?([0-9][0-9,]*\.\d{2})"
-)
+RE_TOTAL_XIAOXIE = re.compile(r"价税合计.{0,40}?[（(]小写[)）][¥￥]?([0-9][0-9,]*\.\d{2})")
 RE_TOTAL_YEN = re.compile(r"价税合计[¥￥]([0-9][0-9,]*\.\d{2})")
 RE_TOTAL_LOOSE = re.compile(r"[（(]小写[)）][¥￥]?([0-9][0-9,]*\.\d{2})")
 RE_TOTAL_WORDS = re.compile(
@@ -146,14 +166,14 @@ RE_TOTAL_WORDS = re.compile(
 
 # 「合计 ¥100.00 ¥6.00」→ 金额、税额（出现在表格末尾）
 # 必须排除「价税合计」，否则会误取价税合计行的数字
-RE_SUBTOTAL = re.compile(
-    r"(?<!价税)[合台]计[¥￥]?([0-9][0-9,]*\.\d{2})[¥￥]?([0-9][0-9,]*\.\d{2})"
-)
+RE_SUBTOTAL = re.compile(r"(?<!价税)[合台]计[¥￥]?([0-9][0-9,]*\.\d{2})[¥￥]?([0-9][0-9,]*\.\d{2})")
 # 单行合计（只有金额没有税额）
 RE_SUBTOTAL_SINGLE = re.compile(r"(?<!价税)[合台]计[¥￥]([0-9][0-9,]*\.\d{2})(?![0-9])")
 
 RE_INVOICE_TITLE = re.compile(r"电子发票[（(]([^)）]{1,20})[)）]")
-RE_VAT_TITLE = re.compile(r"(增值税电子(?:普通|专用)发票|电子发票(?:普通|专用)发票|机动车销售统一发票)")
+RE_VAT_TITLE = re.compile(
+    r"(增值税电子(?:普通|专用)发票|电子发票(?:普通|专用)发票|机动车销售统一发票)"
+)
 
 RE_TAX_RATE = re.compile(r"(\d{1,2})%")
 
@@ -314,7 +334,7 @@ def parse_invoice_type(flat: str) -> str:
 
 def extract_from_text(text: str, source_file: str = "", file_format: str = "") -> Invoice:
     """从发票文本层抽取字段，返回一个 Invoice。"""
-    raw, nl, flat = text_views(text)
+    _raw, nl, flat = text_views(text)
     inv = Invoice(source_file=source_file, file_format=file_format)
 
     m = RE_INVOICE_CODE.search(flat)

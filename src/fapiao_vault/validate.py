@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal
-from typing import Optional
 
 # GB 32100-2015：统一社会信用代码使用的 31 个字符（刻意剔除了 I、O、S、V、Z）
 USCC_ALPHABET = "0123456789ABCDEFGHJKLMNPQRTUWXY"
@@ -21,7 +20,7 @@ _OLD_TAX_RE = re.compile(r"^\d{15}$")
 _DIGITS_RE = re.compile(r"^\d+$")
 
 
-def uscc_check_digit(first17: str) -> Optional[str]:
+def uscc_check_digit(first17: str) -> str | None:
     """计算统一社会信用代码第 18 位校验码。输入非法时返回 None。"""
     if len(first17) != 17 or not _USCC_RE.match(first17 + "0"):
         return None
@@ -159,7 +158,5 @@ def check_arithmetic(inv) -> list[str]:
     if inv.amount is not None and inv.tax is not None and inv.total is not None:
         diff = (inv.amount + inv.tax - inv.total).copy_abs()
         if diff > Decimal("0.01"):
-            issues.append(
-                f"金额不勾稽：金额 {inv.amount} + 税额 {inv.tax} ≠ 价税合计 {inv.total}"
-            )
+            issues.append(f"金额不勾稽：金额 {inv.amount} + 税额 {inv.tax} ≠ 价税合计 {inv.total}")
     return issues

@@ -68,7 +68,9 @@ def parse_file(path: Path | str) -> Invoice:
     if ext in IMAGE_EXTS:
         inv = Invoice(source_file=str(p), file_format=ext.lstrip("."))
         inv.parse_method = "skipped-image"
-        inv.add_issue("图片发票不做 OCR（本工具只处理自带文本层的电子发票），请改用原始 PDF/OFD/XML")
+        inv.add_issue(
+            "图片发票不做 OCR（本工具只处理自带文本层的电子发票），请改用原始 PDF/OFD/XML"
+        )
         inv.recompute_confidence()
         return inv
 

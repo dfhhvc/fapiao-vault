@@ -2,12 +2,14 @@
 
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from fapiao_vault.cli import main
 from tools import make_fixtures
+
+from fapiao_vault.cli import main
 
 
 def run_cli(argv):
@@ -59,15 +61,32 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as out_dir, tempfile.TemporaryDirectory() as arch:
             code, out = run_cli(
                 [
-                    "scan", str(self.dir),
-                    "--out", out_dir,
-                    "--archive", "--archive-dir", arch,
+                    "scan",
+                    str(self.dir),
+                    "--out",
+                    out_dir,
+                    "--archive",
+                    "--archive-dir",
+                    arch,
                     "--no-auto-history",
                 ]
             )
             self.assertEqual(code, 0)
             self.assertIn("已归档 5 个文件", out)
             self.assertTrue(list(Path(arch).rglob("*.pdf")))
+
+    def test_scan_with_cross_period_history(self):
+        # 历史台账月份不同 → CLI 必须把跨期重号显示出来（历史版本算完不显示，静默失效）
+        with tempfile.TemporaryDirectory() as out_dir, tempfile.TemporaryDirectory() as hd:
+            hist = Path(hd) / "h.json"
+            hist.write_text(
+                json.dumps({"rows": [{"uid": "25117000000000000001", "month": "2026-08"}]}),
+                encoding="utf-8",
+            )
+            code, out = run_cli(["scan", str(self.dir), "--out", out_dir, "--history", str(hist)])
+            self.assertEqual(code, 0)
+            self.assertIn("与历史台账重号", out)
+            self.assertIn("2026-08", out)
 
     def test_scan_nonexistent_dir(self):
         code, out = run_cli(["scan", "/definitely/not/a/dir"])

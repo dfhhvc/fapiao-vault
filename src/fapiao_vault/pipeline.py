@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .dedup import group_duplicates, cross_period_duplicates, load_history
+from .dedup import cross_period_duplicates, group_duplicates, load_history
 from .models import DuplicateGroup, Invoice
-from .parsers import SUPPORTED_EXTS, IMAGE_EXTS, parse_file
+from .parsers import IMAGE_EXTS, SUPPORTED_EXTS, parse_file
 from .validate import check_buyer
 
 # 需要跳过的目录（避免把归档产物又扫一遍，造成重复统计）
@@ -21,7 +21,8 @@ DEFAULT_EXCLUDES = {"_归档", "_报表", ".git", "__pycache__", "node_modules",
 class ScanResult:
     invoices: list[Invoice] = field(default_factory=list)
     duplicates: list[DuplicateGroup] = field(default_factory=list)
-    cross_period: list[Invoice] = field(default_factory=list)
+    # 与历史台账重号的发票：(发票, 台账中的月份)
+    cross_period: list[tuple[Invoice, str]] = field(default_factory=list)
     skipped_files: list[tuple[str, str]] = field(default_factory=list)
     scanned_count: int = 0
 
@@ -62,7 +63,7 @@ def scan_directory(
     """扫描目录，返回完整结果。"""
     root = Path(root)
     result = ScanResult()
-    history_uids = load_history(history_path) if history_path else set()
+    history_map = load_history(history_path) if history_path else {}
 
     for path in iter_invoice_files(root, recursive=recursive):
         result.scanned_count += 1
@@ -86,6 +87,13 @@ def scan_directory(
         result.invoices.append(inv)
 
     result.duplicates = group_duplicates(result.invoices)
-    if history_uids:
-        result.cross_period = cross_period_duplicates(result.invoices, history_uids)
+    if history_map:
+        result.cross_period = cross_period_duplicates(result.invoices, history_map)
+        # 命中的发票同步打上问题标记，让 CLI / HTML / Excel / CSV 都能看到
+        for inv, history_month in result.cross_period:
+            inv.add_issue(
+                f"票号已存在于历史台账（台账月份 {history_month}，本次 {inv.month}），"
+                "疑似跨期重复报销"
+            )
+            inv.recompute_confidence()
     return result

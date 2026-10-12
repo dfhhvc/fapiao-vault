@@ -86,7 +86,7 @@ class TestParties(unittest.TestCase):
 
     def test_split_when_markers_destroyed(self):
         _, _, flat = text_views(SAMPLE_GLUED)
-        buyer, seller = split_parties(flat)
+        _buyer, seller = split_parties(flat)
         self.assertEqual(seller, "")  # 标记被打散，退化路径由 extract_parties 兜底
 
     def test_block_layout_parties(self):

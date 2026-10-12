@@ -5,9 +5,10 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from tools import make_fixtures
+
 from fapiao_vault.parsers import parse_file
 from fapiao_vault.pipeline import scan_directory
-from tools import make_fixtures
 
 
 class TestParsers(unittest.TestCase):

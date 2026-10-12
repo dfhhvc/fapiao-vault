@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
-from typing import Any, Optional
-
+from typing import Any
 
 # 置信度：high = 关键字段齐全且通过校验；medium = 缺部分字段；low = 解析失败
 CONF_HIGH = "high"
@@ -25,11 +24,11 @@ class Invoice:
     file_sha256: str = ""  # 文件内容指纹，用于识别"同一张票被下载多次"
 
     # 票种与号码
-    invoice_type: str = ""      # 数电票（电子发票）/ 增值税电子普通发票 / ...
-    invoice_code: str = ""      # 发票代码（数电票无此项）
-    invoice_number: str = ""    # 发票号码
-    invoice_date: str = ""      # 开票日期 YYYY-MM-DD
-    check_code: str = ""        # 校验码（部分普票有）
+    invoice_type: str = ""  # 数电票（电子发票）/ 增值税电子普通发票 / ...
+    invoice_code: str = ""  # 发票代码（数电票无此项）
+    invoice_number: str = ""  # 发票号码
+    invoice_date: str = ""  # 开票日期 YYYY-MM-DD
+    check_code: str = ""  # 校验码（部分普票有）
 
     # 购销双方
     buyer_name: str = ""
@@ -38,15 +37,15 @@ class Invoice:
     seller_tax_id: str = ""
 
     # 金额
-    amount: Optional[Decimal] = None      # 金额（不含税）
-    tax: Optional[Decimal] = None         # 税额
-    total: Optional[Decimal] = None       # 价税合计
-    total_in_words: str = ""              # 价税合计（大写）
+    amount: Decimal | None = None  # 金额（不含税）
+    tax: Decimal | None = None  # 税额
+    total: Decimal | None = None  # 价税合计
+    total_in_words: str = ""  # 价税合计（大写）
 
     items: list[str] = field(default_factory=list)  # 项目名称
 
     # 解析元信息
-    parse_method: str = ""   # text-layer / ofd-xml / invoice-xml
+    parse_method: str = ""  # text-layer / ofd-xml / invoice-xml
     confidence: str = CONF_LOW
     issues: list[str] = field(default_factory=list)  # 解析或校验中发现的问题
 

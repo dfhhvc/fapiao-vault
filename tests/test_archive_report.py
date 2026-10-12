@@ -6,11 +6,12 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from tools import make_fixtures
+
 from fapiao_vault.archive import archive_invoices, build_filename, sanitize, unique_path
 from fapiao_vault.models import Invoice
 from fapiao_vault.pipeline import scan_directory
 from fapiao_vault.report import build_summary, write_csv, write_html, write_json, write_xlsx
-from tools import make_fixtures
 
 
 class TestSanitize(unittest.TestCase):
@@ -141,6 +142,49 @@ class TestReport(unittest.TestCase):
                 self.assertIsNotNone(p)
                 self.assertTrue(p.exists())
                 self.assertGreater(p.stat().st_size, 2000)
+
+    def test_summary_has_cross_period_section(self):
+        self.assertIn("cross_period", self.summary)
+        self.assertEqual(self.summary["totals"]["cross_period"], 0)
+
+    def test_history_written_by_tool_can_be_loaded(self):
+        # 回归：write_json 写出的台账必须能被 load_history 读回。
+        # 历史版本 load_history 找 "invoices" 键而 write_json 写 "rows" 键，
+        # 导致 --history 跨期查重静默失效。
+        from fapiao_vault.dedup import load_history
+
+        with tempfile.TemporaryDirectory() as d:
+            p = write_json(self.summary, Path(d) / "台账.json")
+            history = load_history(p)
+            # rows 含 1 组重复票（同 uid 两份文件），uid→month 字典按 uid 去重属预期
+            unique_uids = {r["uid"] for r in self.summary["rows"]}
+            self.assertEqual(len(history), len(unique_uids))
+            self.assertIn("2026-09", set(history.values()))
+
+    def test_scan_with_history_flags_cross_period(self):
+        # 历史台账月份与本次不同 → 命中，且发票被写入问题标记
+        with tempfile.TemporaryDirectory() as d:
+            hist = Path(d) / "h.json"
+            hist.write_text(
+                json.dumps({"rows": [{"uid": "25117000000000000001", "month": "2026-08"}]}),
+                encoding="utf-8",
+            )
+            result = scan_directory(self.dir, history_path=hist)
+            hits = {inv.invoice_number for inv, _ in result.cross_period}
+            self.assertIn("25117000000000000001", hits)
+            flagged = next(i for i in result.invoices if i.invoice_number == "25117000000000000001")
+            self.assertTrue(any("历史台账" in issue for issue in flagged.issues))
+
+    def test_scan_with_same_month_history_not_flagged(self):
+        # 月份相同 → 同一报销期内重扫，属正常操作，不应命中
+        with tempfile.TemporaryDirectory() as d:
+            hist = Path(d) / "h.json"
+            hist.write_text(
+                json.dumps({"rows": [{"uid": "25117000000000000001", "month": "2026-09"}]}),
+                encoding="utf-8",
+            )
+            result = scan_directory(self.dir, history_path=hist)
+            self.assertEqual(result.cross_period, [])
 
 
 class TestArchive(unittest.TestCase):

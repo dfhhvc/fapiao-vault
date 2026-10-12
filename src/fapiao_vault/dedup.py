@@ -111,27 +111,56 @@ def group_duplicates(invoices: list[Invoice]) -> list[DuplicateGroup]:
     return groups
 
 
-def load_history(path: Path) -> set[str]:
-    """读取历史台账（此前扫描导出过的 json），返回票号集合。"""
+def load_history(path: Path) -> dict[str, str]:
+    """读取历史台账（此前扫描导出过的 json），返回 {uid: 归属月份}。
+
+    兼容三种结构，第一种是本工具 write_json 实际产出的格式：
+    1. 顶层 dict，记录在 "rows" 键下（每条含 uid / month）
+    2. 顶层 dict，记录在 "invoices" 键下（旧版约定）
+    3. 纯列表
+
+    历史版本曾只匹配第 2/3 种结构，导致工具读不回自己写出的台账，
+    跨期查重静默失效——现在三种都支持，并有回归测试锁定（见
+    tests/test_archive_report.py::test_history_written_by_tool_can_be_loaded）。
+    """
     if not path.exists():
-        return set()
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return set()
-    uids: set[str] = set()
-    records = data.get("invoices", data) if isinstance(data, dict) else data
-    if isinstance(records, list):
-        for rec in records:
-            if isinstance(rec, dict) and rec.get("uid"):
-                uids.add(str(rec["uid"]))
-    return uids
+        return {}
+    if isinstance(data, dict):
+        records = data.get("rows") or data.get("invoices") or []
+    elif isinstance(data, list):
+        records = data
+    else:
+        return {}
+    out: dict[str, str] = {}
+    for rec in records:
+        if isinstance(rec, dict) and rec.get("uid"):
+            out[str(rec["uid"])] = str(rec.get("month") or "unknown")
+    return out
 
 
-def cross_period_duplicates(invoices: list[Invoice], history_uids: set[str]) -> list[Invoice]:
-    """找出与历史台账重号、但月份不同的发票（重复报销高风险）。"""
-    out: list[Invoice] = []
+def cross_period_duplicates(
+    invoices: list[Invoice], history: dict[str, str]
+) -> list[tuple[Invoice, str]]:
+    """找出与历史台账重号、且无法确认属于同一月份的发票（重复报销高风险）。
+
+    判定规则：
+    - 台账里没有该票号 → 不算（正常新增）
+    - 票号在台账中、且月份相同 → 不算（同一报销期内重扫，属正常操作）
+    - 票号在台账中、但月份不同 → 命中（同一张票出现在两个报销期）
+    - 月份信息缺失（任一侧为 unknown）→ 命中（无法自证同期，交人工确认）
+
+    返回 [(发票, 台账中的月份), ...]。
+    """
+    out: list[tuple[Invoice, str]] = []
     for inv in invoices:
-        if inv.uid in history_uids:
-            out.append(inv)
+        history_month = history.get(inv.uid)
+        if history_month is None:
+            continue
+        if inv.month == history_month:
+            continue
+        out.append((inv, history_month))
     return out

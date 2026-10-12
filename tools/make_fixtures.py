@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from fapiao_vault.validate import uscc_check_digit  # noqa: E402
+from fapiao_vault.validate import uscc_check_digit
 
 BUYER_NAME = "测试用科技有限公司"
 SELLER_NAME = "示例服务有限公司"
@@ -37,6 +37,7 @@ BUYER_TAX = make_uscc("91330100MA2TETX11")
 SELLER_TAX = make_uscc("91110108MA0DEM09Y")
 
 # ---------------------------------------------------------------- PDF 构建
+
 
 def _to_unicode_cmap(chars: set[str]) -> bytes:
     """构造 ToUnicode CMap：把每个 2 字节码位映射回同一个 Unicode 码点。"""
@@ -104,9 +105,7 @@ def build_pdf(lines: list[str]) -> bytes:
         b"/FontBBox [-25 -254 1000 880] /ItalicAngle 0 /Ascent 880 /Descent -254 "
         b"/CapHeight 880 /StemV 93 >>"
     )
-    objs[8] = (
-        b"<< /Length " + str(len(cmap)).encode() + b" >>\nstream\n" + cmap + b"\nendstream"
-    )
+    objs[8] = b"<< /Length " + str(len(cmap)).encode() + b" >>\nstream\n" + cmap + b"\nendstream"
 
     out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
     offsets: dict[int, int] = {}
@@ -120,18 +119,25 @@ def build_pdf(lines: list[str]) -> bytes:
     out += b"0000000000 65535 f \n"
     for num in sorted(objs):
         out += f"{offsets[num]:010d} 00000 n \n".encode()
-    out += (
-        f"trailer\n<< /Size {size} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode()
-    )
+    out += f"trailer\n<< /Size {size} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode()
     return bytes(out)
 
 
 # ---------------------------------------------------------------- 票面文本
 
-def invoice_lines(number: str, date_cn: str, amount: str, tax: str, total: str,
-                  total_words: str, seller: str = SELLER_NAME,
-                  seller_tax: str = SELLER_TAX, buyer: str = BUYER_NAME,
-                  buyer_tax: str = BUYER_TAX) -> list[str]:
+
+def invoice_lines(
+    number: str,
+    date_cn: str,
+    amount: str,
+    tax: str,
+    total: str,
+    total_words: str,
+    seller: str = SELLER_NAME,
+    seller_tax: str = SELLER_TAX,
+    buyer: str = BUYER_NAME,
+    buyer_tax: str = BUYER_TAX,
+) -> list[str]:
     """生成一张数电票（电子发票·普通发票）的票面文本行。"""
     return [
         "电子发票（普通发票）",
@@ -189,17 +195,17 @@ def build_ofd(lines: list[str]) -> bytes:
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<ofd:Page xmlns:ofd="http://www.ofdspec.org/2016">\n'
-        f"  <ofd:Content>\n    <ofd:Layer ID=\"1\">\n{text_objects}\n    </ofd:Layer>\n  </ofd:Content>\n"
+        f'  <ofd:Content>\n    <ofd:Layer ID="1">\n{text_objects}\n    </ofd:Layer>\n  </ofd:Content>\n'
         f"</ofd:Page>\n"
     )
     document = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        f"<ofd:Document {ns}>\n  <ofd:Pages><ofd:Page ID=\"1\" BaseLoc=\"Pages/Page_0/Content.xml\"/></ofd:Pages>\n"
+        f'<ofd:Document {ns}>\n  <ofd:Pages><ofd:Page ID="1" BaseLoc="Pages/Page_0/Content.xml"/></ofd:Pages>\n'
         f"</ofd:Document>\n"
     )
     root = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        f"<ofd:OFD {ns} Version=\"1.0\">\n  <ofd:DocBody><ofd:DocRoot>Doc_0/Document.xml</ofd:DocRoot></ofd:DocBody>\n"
+        f'<ofd:OFD {ns} Version="1.0">\n  <ofd:DocBody><ofd:DocRoot>Doc_0/Document.xml</ofd:DocRoot></ofd:DocBody>\n'
         f"</ofd:OFD>\n"
     )
 
@@ -212,12 +218,11 @@ def build_ofd(lines: list[str]) -> bytes:
 
 
 def _xml_escape(s: str) -> str:
-    return (
-        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    )
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 # ---------------------------------------------------------------- 主流程
+
 
 def main(target: str | None = None, quiet: bool = False) -> int:
     out = Path(target) if target else Path(__file__).resolve().parents[1] / "samples"

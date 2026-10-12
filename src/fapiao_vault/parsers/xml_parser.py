@@ -10,7 +10,6 @@ import re
 import xml.etree.ElementTree as ET
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 from ..fields import chinese_amount_to_decimal, parse_date, text_views, to_decimal
 from ..models import Invoice
@@ -21,8 +20,12 @@ _KEY_NUMBER = {"invoicenumber", "发票号码", "fphm"}
 _KEY_CODE = {"invoicecode", "发票代码", "fpdm"}
 _KEY_DATE = {"issuedate", "invoicedate", "开票日期", "kprq"}
 _KEY_TOTAL = {
-    "totalamountwithtax", "totaltaxincludedamount", "价税合计", "价税合计小写",
-    "amountwithtax", "jshj",
+    "totalamountwithtax",
+    "totaltaxincludedamount",
+    "价税合计",
+    "价税合计小写",
+    "amountwithtax",
+    "jshj",
 }
 _KEY_TOTAL_WORDS = {"totalamountwithtaxinwords", "价税合计大写", "jshjdx"}
 _KEY_AMOUNT = {"totalamount", "amount", "amountwithouttax", "合计金额", "金额", "hjje"}
@@ -54,7 +57,9 @@ def _norm_key(name: str) -> str:
     return re.sub(r"[\s_\-]", "", name).lower()
 
 
-def parse_invoice_xml_bytes(data: bytes, source_file: str = "", file_format: str = "xml") -> Invoice:
+def parse_invoice_xml_bytes(
+    data: bytes, source_file: str = "", file_format: str = "xml"
+) -> Invoice:
     """解析一份数电票 XML。"""
     inv = Invoice(source_file=source_file, file_format=file_format)
     inv.parse_method = "invoice-xml"
@@ -115,7 +120,9 @@ def parse_invoice_xml_bytes(data: bytes, source_file: str = "", file_format: str
             items.append(value)
     inv.items = items[:12]
 
-    inv.invoice_type = find(_KEY_TYPE) or classify_invoice_number(inv.invoice_code, inv.invoice_number)
+    inv.invoice_type = find(_KEY_TYPE) or classify_invoice_number(
+        inv.invoice_code, inv.invoice_number
+    )
     return inv
 
 

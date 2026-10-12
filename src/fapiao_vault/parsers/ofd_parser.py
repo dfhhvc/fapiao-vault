@@ -8,8 +8,8 @@ OFD（Open Fixed-layout Document，GB/T 33190-2016）本质上是一个 ZIP 包�
 from __future__ import annotations
 
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 from ..fields import extract_from_text
@@ -31,7 +31,9 @@ def _extract_text_from_xml(data: bytes) -> list[str]:
     except ET.ParseError:
         # XML 破损时退化为正则兜底，保证不因个别文件整批失败
         text = data.decode("utf-8", errors="ignore")
-        for m in re.finditer(r"<(?:\w+:)?Text(?:Code)?[^>]*>(.*?)</(?:\w+:)?Text(?:Code)?>", text, re.S):
+        for m in re.finditer(
+            r"<(?:\w+:)?Text(?:Code)?[^>]*>(.*?)</(?:\w+:)?Text(?:Code)?>", text, re.S
+        ):
             val = re.sub(r"<[^>]+>", "", m.group(1)).strip()
             if val:
                 out.append(val)

@@ -9,10 +9,11 @@ from __future__ import annotations
 import csv
 import html
 import json
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .models import Invoice
 
@@ -77,6 +78,19 @@ def build_summary(result) -> dict[str, Any]:
         for g in result.duplicates
     ]
 
+    cross_period = [
+        {
+            "uid": inv.uid,
+            "invoice_number": inv.invoice_number,
+            "month": inv.month,
+            "history_month": history_month,
+            "total": str(inv.total) if inv.total is not None else "",
+            "seller": inv.seller_name,
+            "file": Path(inv.source_file).name,
+        }
+        for inv, history_month in getattr(result, "cross_period", [])
+    ]
+
     return {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "totals": {
@@ -85,6 +99,7 @@ def build_summary(result) -> dict[str, Any]:
             "failed": len(result.failed_invoices),
             "duplicate_groups": len(result.duplicates),
             "high_risk": len([d for d in result.duplicates if d.severity == "high"]),
+            "cross_period": len(cross_period),
             "total": str(_sum(i.total for i in ok)),
             "tax": str(_sum(i.tax for i in ok)),
             "amount": str(_sum(i.amount for i in ok)),
@@ -93,12 +108,14 @@ def build_summary(result) -> dict[str, Any]:
         "by_seller": dump(by_seller)[:20],
         "by_type": dump(by_type),
         "duplicates": duplicates,
+        "cross_period": cross_period,
         "issues": issues,
         "rows": [inv.to_dict() for inv in invoices],
     }
 
 
 # ------------------------------------------------------------------ JSON
+
 
 def write_json(summary: dict[str, Any], path: Path | str) -> Path:
     p = Path(path)
@@ -146,6 +163,7 @@ def write_csv(summary: dict[str, Any], path: Path | str) -> Path:
 
 
 # ------------------------------------------------------------------ Excel
+
 
 def write_xlsx(summary: dict[str, Any], path: Path | str) -> Path | None:
     """导出 Excel。未安装 openpyxl 时返回 None（调用方降级为 CSV）。"""
@@ -234,6 +252,22 @@ def write_xlsx(summary: dict[str, Any], path: Path | str) -> Path | None:
         if d["severity"] == "high":
             for c in range(1, 8):
                 ws3.cell(row=ws3.max_row, column=c).fill = high_fill
+
+    # 与历史台账重号（跨期重复报销）
+    for cp in summary.get("cross_period", []):
+        ws3.append(
+            [
+                "高风险(跨期)",
+                cp["invoice_number"] or cp["uid"],
+                f"台账月份 {cp['history_month']}，本次 {cp['month']}，疑似跨期重复报销",
+                cp["file"],
+                cp["total"],
+                cp["seller"],
+                "",
+            ]
+        )
+        for c in range(1, 8):
+            ws3.cell(row=ws3.max_row, column=c).fill = high_fill
     for i, w in enumerate([10, 26, 46, 60, 12, 28, 12], start=1):
         ws3.column_dimensions[get_column_letter(i)].width = w
 
@@ -265,15 +299,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .wrap{max-width:1180px;margin:0 auto}
   h1{font-size:24px;margin:0 0 4px}
   .sub{color:var(--muted);font-size:13px;margin-bottom:22px}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+  .cards{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .card.primary{grid-column:span 2}
   .card .k{font-size:12px;color:var(--muted);margin-bottom:6px}
-  .card .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .card .v{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
   .card .v.sm{font-size:19px}
+  .card .v.ok{color:var(--ok)}
+  .card .v.warn{color:var(--warn)}
+  .card .v.danger{color:var(--danger)}
+  @media (max-width: 920px){
+    .cards{grid-template-columns:repeat(2,1fr)}
+    .card.primary{grid-column:span 2}
+  }
   .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
            margin-bottom:18px;overflow:hidden}
-  .section > h2{font-size:15px;margin:0;padding:14px 18px;border-bottom:1px solid var(--border)}
-  .section .body{padding:14px 18px}
+  .section > h2{font-size:15px;margin:0;padding:13px 18px;border-bottom:1px solid var(--border)}
+  .section.alert > h2{color:var(--danger);box-shadow:inset 3px 0 0 var(--danger)}
+  .section .body{padding:10px 18px}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
   th{color:var(--muted);font-weight:600;font-size:12px;background:transparent;position:sticky;top:0;background:var(--card)}
@@ -309,7 +352,11 @@ const fmt = (v) => v === null || v === undefined || v === "" ? "" : v;
 const money = (v) => (v === "" || v == null) ? "—" : "¥" + Number(v).toLocaleString("zh-CN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-function card(k, v, cls){ return `<div class="card"><div class="k">${esc(k)}</div><div class="v ${cls||""}">${v}</div></div>`; }
+function card(k, v, cls){
+  const cardCls = cls && cls.includes("primary") ? "card primary" : "card";
+  const vCls = (cls || "").split(" ").filter(c => c && c !== "primary").join(" ");
+  return `<div class="${cardCls}"><div class="k">${esc(k)}</div><div class="v ${vCls}">${v}</div></div>`;
+}
 
 function render(){
   const t = DATA.totals;
@@ -317,14 +364,16 @@ function render(){
     `扫描时间：${DATA.generated_at}　·　识别成功 ${t.ok} 张 / 共扫描 ${t.scanned} 个文件`;
 
   document.getElementById("cards").innerHTML = [
-    card("价税合计总额", money(t.total)),
+    card("价税合计总额", money(t.total), "primary"),
     card("其中税额", money(t.tax), "sm"),
-    card("识别成功", `${t.ok} 张`, "sm"),
-    card("重复发票", `${t.duplicate_groups} 组` + (t.high_risk ? `（高风险 ${t.high_risk}）` : ""), "sm"),
-    card("需人工处理", `${t.failed} 个文件`, "sm"),
+    card("识别成功", `${t.ok} 张`, "sm ok"),
+    card("重复发票", `${t.duplicate_groups} 组` + (t.high_risk ? `（高风险 ${t.high_risk}）` : ""),
+         t.duplicate_groups > 0 ? "sm danger" : "sm ok"),
+    card("需人工处理", `${t.failed} 个文件`, t.failed > 0 ? "sm warn" : "sm ok"),
   ].join("");
 
   const sec = [];
+  sec.push(crossSection());
   sec.push(dupSection());
   sec.push(tableSection());
   sec.push(groupSection("按月份汇总", DATA.by_month, "月份"));
@@ -333,6 +382,21 @@ function render(){
   sec.push(issueSection());
   document.getElementById("sections").innerHTML = sec.join("");
   bindTable();
+}
+
+function crossSection(){
+  if(!DATA.cross_period || !DATA.cross_period.length) return "";
+  const rows = DATA.cross_period.map(c => `<tr>
+    <td><span class="pill high">高风险</span></td>
+    <td>${esc(c.invoice_number || c.uid)}</td>
+    <td class="wrapcell">台账月份 ${esc(c.history_month)}，本次 ${esc(c.month)} —— 疑似跨期重复报销</td>
+    <td class="num">${money(c.total)}</td>
+    <td class="wrapcell">${esc(c.file)}</td>
+  </tr>`).join("");
+  return `<div class="section alert"><h2>与历史台账重号（${DATA.cross_period.length}，疑似跨期重复报销）</h2>
+    <div class="body"><table><thead><tr>
+      <th>等级</th><th>发票标识</th><th>说明</th><th class="num">金额</th><th>文件</th>
+    </tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function dupSection(){
@@ -344,7 +408,7 @@ function dupSection(){
     <td class="num">${money(d.total)}</td>
     <td class="wrapcell">${d.files.map(esc).join("<br>")}</td>
   </tr>`).join("");
-  return `<div class="section"><h2>重复发票警告（${DATA.duplicates.length} 组）</h2>
+  return `<div class="section alert"><h2>重复发票警告（${DATA.duplicates.length} 组）</h2>
     <div class="body"><table><thead><tr>
       <th>等级</th><th>发票标识</th><th>原因</th><th class="num">金额</th><th>涉及文件</th>
     </tr></thead><tbody>${rows}</tbody></table></div></div>`;

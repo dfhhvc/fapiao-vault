@@ -33,7 +33,7 @@ class TestUscc(unittest.TestCase):
 
     def test_validate_illegal_char(self):
         # O / I / S / V / Z 是被国家标准刻意剔除的字符
-        ok, msg = validate_uscc("91330100MA2XXXXXXO")
+        ok, _msg = validate_uscc("91330100MA2XXXXXXO")
         self.assertFalse(ok)
 
     def test_validate_length(self):
@@ -42,7 +42,7 @@ class TestUscc(unittest.TestCase):
         self.assertIn("长度", msg)
 
     def test_empty(self):
-        ok, msg = validate_uscc("")
+        ok, _msg = validate_uscc("")
         self.assertFalse(ok)
 
     def test_check_digit_none_on_bad_input(self):
@@ -71,7 +71,7 @@ class TestInvoiceNumber(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_digital_with_code_is_invalid(self):
-        ok, msg = validate_invoice_number("123456789012", "25117000000000000001")
+        ok, _msg = validate_invoice_number("123456789012", "25117000000000000001")
         self.assertFalse(ok)
 
     def test_classic_8_with_12_code(self):
@@ -93,8 +93,15 @@ class TestInvoiceNumber(unittest.TestCase):
 
 class TestBuyerCheck(unittest.TestCase):
     def test_match(self):
-        self.assertEqual(check_buyer("测试用科技有限公司", "91330100MA2XXXXXX2",
-                                     ["测试用科技有限公司"], ["91330100MA2XXXXXX2"]), [])
+        self.assertEqual(
+            check_buyer(
+                "测试用科技有限公司",
+                "91330100MA2XXXXXX2",
+                ["测试用科技有限公司"],
+                ["91330100MA2XXXXXX2"],
+            ),
+            [],
+        )
 
     def test_name_mismatch(self):
         issues = check_buyer("别的公司有限公司", "", ["测试用科技有限公司"], [])
@@ -102,8 +109,12 @@ class TestBuyerCheck(unittest.TestCase):
         self.assertIn("抬头不符", issues[0])
 
     def test_tax_id_mismatch(self):
-        issues = check_buyer("测试用科技有限公司", "91330100MA2XXXXXX2",
-                             ["测试用科技有限公司"], ["91110108MA0DEM09Y6"])
+        issues = check_buyer(
+            "测试用科技有限公司",
+            "91330100MA2XXXXXX2",
+            ["测试用科技有限公司"],
+            ["91110108MA0DEM09Y6"],
+        )
         self.assertEqual(len(issues), 1)
         self.assertIn("税号不符", issues[0])
 
@@ -118,6 +129,7 @@ class TestBuyerCheck(unittest.TestCase):
 class TestArithmetic(unittest.TestCase):
     def _inv(self, amount, tax, total):
         from decimal import Decimal
+
         from fapiao_vault.models import Invoice
 
         i = Invoice()

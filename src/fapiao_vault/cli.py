@@ -55,6 +55,7 @@ def _rule(width: int = 62) -> str:
 
 # ---------------------------------------------------------------- scan
 
+
 def cmd_scan(args: argparse.Namespace) -> int:
     root = Path(args.directory).expanduser().resolve()
     if not root.exists():
@@ -115,6 +116,17 @@ def cmd_scan(args: argparse.Namespace) -> int:
             for inv in g.invoices:
                 print(dim(f"        - {Path(inv.source_file).name}"))
 
+    # ---- 与历史台账重号（跨期）
+    if result.cross_period:
+        print()
+        print(bold("与历史台账重号（跨期，疑似重复报销）"))
+        for inv, history_month in result.cross_period[:20]:
+            print(
+                f"  {red('!')} {inv.invoice_number or inv.uid}"
+                f"  台账月份 {history_month} / 本次 {inv.month}"
+            )
+            print(dim(f"        - {Path(inv.source_file).name}"))
+
     # ---- 问题清单
     problem_invoices = [i for i in result.invoices if i.issues]
     if problem_invoices:
@@ -145,7 +157,9 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     # ---- 归档
     if args.archive:
-        archive_dir = Path(args.archive_dir).expanduser().resolve() if args.archive_dir else root / "_归档"
+        archive_dir = (
+            Path(args.archive_dir).expanduser().resolve() if args.archive_dir else root / "_归档"
+        )
         done, errors = archive_invoices(
             result.ok_invoices, archive_dir, style=args.style, group_by_month=True
         )
@@ -165,6 +179,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- verify
 
+
 def cmd_verify(args: argparse.Namespace) -> int:
     code = args.code.strip()
     ok, msg = validate_tax_id(code)
@@ -182,6 +197,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- 入口
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fapiao",
@@ -193,11 +209,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan = sub.add_parser("scan", help="扫描目录中的发票并生成报表")
     p_scan.add_argument("directory", help="发票所在目录")
     p_scan.add_argument("--out", help="报表输出目录（默认 <目录>/_报表）")
-    p_scan.add_argument("--no-recursive", dest="recursive", action="store_false", help="不递归子目录")
+    p_scan.add_argument(
+        "--no-recursive", dest="recursive", action="store_false", help="不递归子目录"
+    )
     p_scan.add_argument("--history", help="历史台账 JSON，用于检测跨期重复报销")
     p_scan.add_argument("--no-auto-history", action="store_true", help="不自动读取 _报表/台账.json")
-    p_scan.add_argument("--company", action="append", help="公司抬头（可重复指定），用于抬头合规校验")
-    p_scan.add_argument("--tax-id", action="append", help="公司税号（可重复指定），用于抬头合规校验")
+    p_scan.add_argument(
+        "--company", action="append", help="公司抬头（可重复指定），用于抬头合规校验"
+    )
+    p_scan.add_argument(
+        "--tax-id", action="append", help="公司税号（可重复指定），用于抬头合规校验"
+    )
     p_scan.add_argument("--archive", action="store_true", help="同时按月份归档并重命名")
     p_scan.add_argument("--archive-dir", help="归档目录（默认 <目录>/_归档）")
     p_scan.add_argument(

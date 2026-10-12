@@ -89,31 +89,64 @@ class TestGroupDuplicates(unittest.TestCase):
 class TestHistory(unittest.TestCase):
     def test_load_history_missing_file(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(load_history(Path(d) / "nope.json"), set())
+            self.assertEqual(load_history(Path(d) / "nope.json"), {})
 
     def test_load_history_bad_json(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "bad.json"
             p.write_text("{not json", encoding="utf-8")
-            self.assertEqual(load_history(p), set())
+            self.assertEqual(load_history(p), {})
 
     def test_load_history_list_form(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "h.json"
-            p.write_text(json.dumps([{"uid": "A1"}, {"uid": "A2"}]), encoding="utf-8")
-            self.assertEqual(load_history(p), {"A1", "A2"})
+            p.write_text(
+                json.dumps([{"uid": "A1", "month": "2026-09"}, {"uid": "A2"}]),
+                encoding="utf-8",
+            )
+            self.assertEqual(load_history(p), {"A1": "2026-09", "A2": "unknown"})
 
     def test_load_history_dict_form(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "h.json"
-            p.write_text(json.dumps({"invoices": [{"uid": "B1"}]}), encoding="utf-8")
-            self.assertEqual(load_history(p), {"B1"})
+            p.write_text(
+                json.dumps({"invoices": [{"uid": "B1", "month": "2026-08"}]}),
+                encoding="utf-8",
+            )
+            self.assertEqual(load_history(p), {"B1": "2026-08"})
 
-    def test_cross_period(self):
-        items = [inv("25117000000000000001"), inv("25117000000000000009")]
-        hit = cross_period_duplicates(items, {"25117000000000000009"})
-        self.assertEqual(len(hit), 1)
-        self.assertEqual(hit[0].invoice_number, "25117000000000000009")
+    def test_load_history_rows_form_written_by_tool(self):
+        # 本工具 write_json 实际写出的结构：顶层 dict + "rows" 键（含 uid 和 month）。
+        # 历史版本 load_history 只认 "invoices"/列表，读不回自己的台账，此测试锁定该契约。
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "h.json"
+            p.write_text(
+                json.dumps({"totals": {}, "rows": [{"uid": "C1", "month": "2026-09"}]}),
+                encoding="utf-8",
+            )
+            self.assertEqual(load_history(p), {"C1": "2026-09"})
+
+    def test_cross_period_flags_different_month_only(self):
+        sep = inv("25117000000000000001", date="2026-09-01", total="25.75")
+        october = inv("25117000000000000009", date="2026-10-01", total="30.00")
+        same_month = inv("25117000000000000002", date="2026-09-01", total="40.00")
+        history = {
+            "25117000000000000001": "2026-08",  # 月份不同 → 命中
+            "25117000000000000002": "2026-09",  # 月份相同 → 正常重扫，不命中
+            "25117000000000000009": "unknown",  # 台账月份缺失 → 命中（无法确认同期）
+        }
+        hits = cross_period_duplicates([sep, october, same_month], history)
+        self.assertEqual(
+            {(i.invoice_number, m) for i, m in hits},
+            {
+                ("25117000000000000001", "2026-08"),
+                ("25117000000000000009", "unknown"),
+            },
+        )
+
+    def test_cross_period_empty_history(self):
+        items = [inv("25117000000000000001", date="2026-09-01")]
+        self.assertEqual(cross_period_duplicates(items, {}), [])
 
 
 if __name__ == "__main__":

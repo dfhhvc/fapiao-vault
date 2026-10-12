@@ -1,6 +1,23 @@
+<div align="center">
+
+<img src="docs/logo.svg" width="128" alt="FapiaoVault logo" />
+
 # FapiaoVault · 发票管家
 
-**纯本地电子发票整理、查重与报销汇总工具。不联网、不上传、不用 AI、不用 OCR。**
+**纯本地电子发票整理、查重与报销汇总工具**
+
+不联网 · 不上传 · 不用 AI · 不用 OCR
+
+[![CI](https://github.com/dfhhvc/fapiao-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/dfhhvc/fapiao-vault/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+
+**[中文](README.md)** · [English](README.en.md)
+
+</div>
+
+---
 
 把一堆乱七八糟的发票文件（PDF / OFD / XML）丢进一个文件夹，一条命令得到：
 **去重后的归档 + 报销汇总表 + 一份可以离线打开的报告。**
@@ -8,6 +25,15 @@
 ```bash
 fapiao scan ./我的发票 --archive
 ```
+
+![终端演示](docs/demo-terminal.svg)
+
+## 报告长这样
+
+双击 `发票报告.html` 即可离线打开——搜索、筛选、汇总、风险标红，全部内置，
+不加载任何外部资源：
+
+![HTML 报告预览](docs/report-preview.png)
 
 ---
 
@@ -38,7 +64,7 @@ fapiao scan ./我的发票 --archive
 | 需要 API Key / 联网 | **不需要** | 需要 | 不需要 |
 | 识别方式 | **文本层确定性解析** | 大模型/OCR（有误差） | 人眼 |
 | 需要配置邮箱授权码 | **不需要** | 通常需要 | 不需要 |
-| 发票查重 | **支持** | 少见 | 靠记性 |
+| 发票查重 | **批内 + 跨期台账** | 少见 | 靠记性 |
 | 抬头/税号合规校验 | **支持（含校验位）** | 少见 | 靠人眼 |
 | 处理速度 | 毫秒级 | 受网络与额度限制 | 按小时算 |
 | 安装体积 | **几百 KB** | 常需下载几百 MB 运行时 | — |
@@ -50,7 +76,7 @@ fapiao scan ./我的发票 --archive
 ### 1. 安装
 
 ```bash
-git clone https://github.com/<your-name>/fapiao-vault.git
+git clone https://github.com/dfhhvc/fapiao-vault.git
 cd fapiao-vault
 pip install -e ".[pdf,excel]"
 ```
@@ -105,8 +131,9 @@ _归档/
 
 工具在解析后会做这些校验，并把问题写进报告：
 
-- **重复报销风险（高风险）**：同一张发票号出现在**不同月份** —— 这是最容易被财务判定为
-  故意重复报销的场景，工具会单独标红
+- **跨期重复报销（最高风险）**：本次扫描的票号已存在于**历史台账**且月份不同
+  —— 这是财务最警惕的场景，会与批内查重分开单独标红
+- **重复报销风险（高风险）**：同一张发票号出现在**不同月份**的扫描批次内
 - **同一张票重复收集**：同批次内票号相同，或文件内容完全一致（sha256）
 - **抬头不符**：购买方名称与你公司的抬头不一致
 - **税号错误**：购买方税号与公司税号不符，或**校验位算不过**（GB 32100-2015）
@@ -157,7 +184,7 @@ _归档/
 
 1. **文本层版式兼容**。数电票的购买方/销售方用纵向标签（购/买/方/信/息），
    PDF 抽取后这些字会与字段值粘连（`…有限公司买`）。工具用"分区切分 + 出现顺序兜底"
-   双路径识别，并对粘连的标签字做定向剥离。
+   双路径识别，两种版式都有测试样例锁定。
 2. **查重不误报**。完全没解析出内容的文件（既无号码也无金额）**不参与**内容级查重，
    否则一堆"解析失败"的文件会被误报成互相重复。
 
@@ -179,19 +206,22 @@ _归档/
 ## 测试
 
 ```bash
-python -m unittest discover -s tests -t .
+python -m unittest discover -s tests
 ```
 
-**95 个测试，零测试依赖**（只用标准库 `unittest`），覆盖：
+**102 个测试，零测试依赖**（只用标准库 `unittest`），覆盖：
 
 - 统一社会信用代码校验位（含**手工验算**的样例，不循环自证）
 - 中文大写金额解析（元/角/分、万、拾 的边界）
 - 两类真实的数电票文本层版式（分区完整 vs 纵向标签粘连）
 - PDF / OFD / XML 三种格式的**端到端**解析（测试样例由代码动态生成）
-- 三级查重、跨期重复、历史台账
+- 三级查重、跨期重复、历史台账（含"工具写出的台账必须能被读回"的回归测试）
 - 报表输出（含 HTML 自包含性与 XSS 转义）
 - 归档重命名与不覆盖保证
 - CLI 全命令
+
+CI 在 **Ubuntu / Windows × Python 3.9–3.13** 十个组合上跑全部测试，
+外加一个**不装任何 extras** 的 `core-only` 任务，守住"零硬依赖"的承诺。
 
 生成测试样例：
 
@@ -231,15 +261,16 @@ fapiao-vault/
 │   ├── models.py          # Invoice 数据模型（金额用 Decimal）
 │   ├── fields.py          # 字段抽取：三种文本视图 + 版式规则
 │   ├── validate.py        # 税号校验位、发票号码格式、抬头合规、金额勾稽
-│   ├── dedup.py           # 三级查重引擎
+│   ├── dedup.py           # 三级查重引擎 + 历史台账
 │   ├── parsers/           # pdf / ofd / xml 三个解析器 + 调度
 │   ├── pipeline.py        # 扫描流水线
 │   ├── archive.py         # 归档重命名
 │   ├── report.py          # HTML / Excel / CSV / JSON 报表
 │   └── cli.py             # 命令行入口
-├── tests/                 # 95 个单元测试（标准库 unittest）
+├── tests/                 # 102 个单元测试（标准库 unittest）
 ├── tools/make_fixtures.py # 合成测试样例生成器
-└── samples/               # 生成的测试样例
+├── samples/               # 生成的测试样例
+└── docs/                  # logo 与 README 演示图
 ```
 
 ---
@@ -255,9 +286,11 @@ fapiao-vault/
 
 ## 贡献
 
-欢迎提交 Issue 和 PR。如果遇到解析失败的发票，**请把脱敏后的票面文本**（而不是原始票据）
-附在 Issue 里，那是最有效的反馈方式。
+欢迎提交 Issue 和 PR，详见[贡献指南](CONTRIBUTING.md)。如果遇到解析失败的发票，
+**请把脱敏后的票面文本**（而不是原始票据）附在 Issue 里，那是最有效的反馈方式。
+
+安全漏洞请勿公开 issue，报告方式见[安全策略](SECURITY.md)。
 
 ## 许可证
 
-MIT
+[MIT](LICENSE)
