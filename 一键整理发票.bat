@@ -50,8 +50,8 @@ set "CFG=%~dp0报销配置.txt"
 set "COMPANY="
 set "TAXID="
 if exist "%CFG%" (
-    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "Get-Content -LiteralPath '%CFG%' -Encoding UTF8 | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1"`) do set "COMPANY=%%A"
-    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "Get-Content -LiteralPath '%CFG%' -Encoding UTF8 | Where-Object { $_.Trim() -ne '' } | Select-Object -First 2 | Select-Object -Last 1"`) do set "TAXID=%%A"
+    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$c=Get-Content -LiteralPath '%CFG%' -Encoding UTF8; if(($c-join '').IndexOf([char]0xFFFD) -ge 0){$c=Get-Content -LiteralPath '%CFG%' -Encoding Default}; $c | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1"`) do set "COMPANY=%%A"
+    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$c=Get-Content -LiteralPath '%CFG%' -Encoding UTF8; if(($c-join '').IndexOf([char]0xFFFD) -ge 0){$c=Get-Content -LiteralPath '%CFG%' -Encoding Default}; $c | Where-Object { $_.Trim() -ne '' } | Select-Object -First 2 | Select-Object -Last 1"`) do set "TAXID=%%A"
 )
 if defined COMPANY (
     echo [信息] 已加载 报销配置.txt：公司 "%COMPANY%"，已开启抬头/税号校验
@@ -76,4 +76,3 @@ if "%RC%"=="0" (
 echo.
 pause
 endlocal & chcp %OLDCP% >nul
-pause
