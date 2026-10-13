@@ -1,23 +1,27 @@
 @echo off
-chcp 65001 >nul
 setlocal
+for /f "tokens=2 delims=:" %%C in ('chcp') do set /a OLDCP=%%C
+chcp 936 >nul
 cd /d "%~dp0"
 
 echo ============================================================
-echo   FapiaoVault - æœ¬åœ°å‘ç¥¨æ•´ç†åŠ©æ‰‹ï¼ˆä¸è”ç½‘ã€ä¸ä¸Šä¼ ï¼‰
+echo   FapiaoVault - ±¾µØ·¢Æ±ÕûÀíÖúÊÖ£¨²»ÁªÍø¡¢²»ÉÏ´«£©
 echo ============================================================
 echo.
 
-rem ç”¨æ³•ï¼šåŒå‡»æœ¬æ–‡ä»¶ä¼šæ‰«æ samples ç¤ºä¾‹ç›®å½•ï¼›
-rem       æŠŠä»»æ„å‘ç¥¨æ–‡ä»¶å¤¹æ‹–åˆ°æœ¬æ–‡ä»¶å›¾æ ‡ä¸Šï¼Œåˆ™æ‰«æè¯¥æ–‡ä»¶å¤¹ã€‚
+rem ÓÃ·¨£ºË«»÷±¾ÎÄ¼ş»áÉ¨Ãè samples Ê¾ÀıÄ¿Â¼£»
+rem       °ÑÈÎÒâ·¢Æ±ÎÄ¼ş¼ĞÍÏµ½±¾ÎÄ¼şÍ¼±êÉÏ£¬ÔòÉ¨Ãè¸ÃÎÄ¼ş¼Ğ¡£
+rem       ¿ÉÑ¡£ºÔÚ±¾ÎÄ¼şÍ¬Ä¿Â¼·ÅÒ»¸ö"±¨ÏúÅäÖÃ.txt"£¬µÚÒ»ĞĞĞ´¹«Ë¾È«³Æ£¬
+rem       µÚ¶şĞĞĞ´ 18 Î»Ë°ºÅ£¬¼´¿É×Ô¶¯¿ªÆôÌ§Í·/Ë°ºÅºÏ¹æĞ£Ñé¡£
+rem       Ä£°å¼ûÍ¬Ä¿Â¼"±¨ÏúÅäÖÃ.example.txt"¡£
 set "TARGET=%~dp0samples"
 if not "%~1"=="" set "TARGET=%~1"
 
 where python >nul 2>nul
 if errorlevel 1 (
-    echo [é”™è¯¯] æ²¡æœ‰æ‰¾åˆ° Pythonã€‚è¯·å…ˆå®‰è£… Python 3.9 æˆ–æ›´é«˜ç‰ˆæœ¬ï¼š
+    echo [´íÎó] Ã»ÓĞÕÒµ½ Python¡£ÇëÏÈ°²×° Python 3.9 »ò¸ü¸ß°æ±¾£º
     echo        https://www.python.org/downloads/
-    echo        å®‰è£…æ—¶åŠ¡å¿…å‹¾é€‰ "Add Python to PATH"ã€‚
+    echo        °²×°Ê±Îñ±Ø¹´Ñ¡ "Add Python to PATH"¡£
     echo.
     pause
     exit /b 1
@@ -25,7 +29,7 @@ if errorlevel 1 (
 
 python -c "import sys; sys.exit(0 if sys.version_info>=(3,9) else 1)" >nul 2>nul
 if errorlevel 1 (
-    echo [é”™è¯¯] Python ç‰ˆæœ¬è¿‡ä½ï¼Œéœ€è¦ 3.9 æˆ–æ›´é«˜ã€‚å½“å‰ç‰ˆæœ¬ï¼š
+    echo [´íÎó] Python °æ±¾¹ıµÍ£¬ĞèÒª 3.9 »ò¸ü¸ß¡£µ±Ç°°æ±¾£º
     python --version
     echo.
     pause
@@ -34,23 +38,42 @@ if errorlevel 1 (
 
 python -c "import pypdf" >nul 2>nul
 if errorlevel 1 (
-    echo [æç¤º] é¦–æ¬¡è¿è¡Œéœ€è¦å®‰è£… PDF è§£æåº“ pypdfï¼Œæ­£åœ¨å®‰è£…ï¼ˆä»…æ­¤ä¸€æ¬¡ï¼‰...
+    echo [ÌáÊ¾] Ê×´ÎÔËĞĞĞèÒª°²×° PDF ½âÎö¿â pypdf£¬ÕıÔÚ°²×°£¨½ö´ËÒ»´Î£©...
     python -m pip install pypdf
     echo.
 )
 
 set PYTHONPATH=%~dp0src
-echo [ä¿¡æ¯] æ­£åœ¨æ‰«æï¼š%TARGET%
+
+rem ---- ¿ÉÑ¡£º¶ÁÈ¡±¨ÏúÅäÖÃ£¨µÚÒ»ĞĞ¹«Ë¾Ãû£¬µÚ¶şĞĞË°ºÅ£©£¬×Ô¶¯¿ªÆôÌ§Í·Ğ£Ñé ----
+set "CFG=%~dp0±¨ÏúÅäÖÃ.txt"
+set "COMPANY="
+set "TAXID="
+if exist "%CFG%" (
+    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "Get-Content -LiteralPath '%CFG%' -Encoding UTF8 | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1"`) do set "COMPANY=%%A"
+    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "Get-Content -LiteralPath '%CFG%' -Encoding UTF8 | Where-Object { $_.Trim() -ne '' } | Select-Object -First 2 | Select-Object -Last 1"`) do set "TAXID=%%A"
+)
+if defined COMPANY (
+    echo [ĞÅÏ¢] ÒÑ¼ÓÔØ ±¨ÏúÅäÖÃ.txt£º¹«Ë¾ "%COMPANY%"£¬ÒÑ¿ªÆôÌ§Í·/Ë°ºÅĞ£Ñé
+) else (
+    echo [ĞÅÏ¢] Î´ÕÒµ½ ±¨ÏúÅäÖÃ.txt£¬Ìø¹ıÌ§Í·Ğ£Ñé£¨Ïë¿ªÆôÇë²Î¿¼ ±¨ÏúÅäÖÃ.example.txt£©
+)
+echo [ĞÅÏ¢] ÕıÔÚÉ¨Ãè£º%TARGET%
 echo.
 
-python -m fapiao_vault scan "%TARGET%" --archive --open-report
+set "CMDLINE=scan "%TARGET%" --archive --open-report"
+if defined COMPANY set CMDLINE=%CMDLINE% --company "%COMPANY%"
+if defined TAXID set CMDLINE=%CMDLINE% --tax-id "%TAXID%"
+python -m fapiao_vault %CMDLINE%
 set RC=%errorlevel%
 
 echo.
 if "%RC%"=="0" (
-    echo å®Œæˆã€‚æŠ¥è¡¨åœ¨æ‰«æç›®å½•ä¸‹çš„ "_æŠ¥è¡¨" æ–‡ä»¶å¤¹ï¼Œå½’æ¡£åœ¨ "_å½’æ¡£" æ–‡ä»¶å¤¹ã€‚
+    echo Íê³É¡£±¨±íÔÚÉ¨ÃèÄ¿Â¼ÏÂµÄ "_±¨±í" ÎÄ¼ş¼Ğ£¬¹éµµÔÚ "_¹éµµ" ÎÄ¼ş¼Ğ¡£
 ) else (
-    echo è¿è¡Œç»“æŸï¼Œä½†è¿”å›ç ä¸º %RC%ï¼Œè¯·æŸ¥çœ‹ä¸Šæ–¹è¾“å‡ºã€‚
+    echo ÔËĞĞ½áÊø£¬µ«·µ»ØÂëÎª %RC%£¬Çë²é¿´ÉÏ·½Êä³ö¡£
 )
 echo.
+pause
+endlocal & chcp %OLDCP% >nul
 pause

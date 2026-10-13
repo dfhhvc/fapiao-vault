@@ -93,7 +93,19 @@ pip install -e ".[pdf,excel]"
   with the standard library)
 - `excel`: `.xlsx` export (optional — degrades gracefully to CSV)
 
-### 2. CLI
+### 2. One-click on Windows
+
+Double-click `一键整理发票.bat` in the repo root (installs `pypdf` automatically on
+first run). **Drag any invoice folder onto its icon** to scan that folder; a plain
+double-click scans the bundled `samples/` demo directory. The HTML report opens
+automatically when the scan finishes.
+
+Optional header validation: copy `报销配置.example.txt`, rename the copy to
+`报销配置.txt` (same folder as the bat), then edit line 1 with your company name
+and line 2 with your 18-digit tax ID — mismatched invoices get flagged on every
+scan. Without the file everything still works; header checking is simply skipped.
+
+### 3. CLI
 
 ```bash
 # Scan + generate reports

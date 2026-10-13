@@ -90,6 +90,11 @@ pip install -e ".[pdf,excel]"
 **把任意发票文件夹拖到它的图标上**，就会扫描该文件夹；直接双击则扫描 `samples` 示例目录。
 扫描完成后会自动打开 HTML 报告。
 
+**开启抬头校验（推荐）**：把 `报销配置.example.txt` 复制一份、重命名为 `报销配置.txt`
+（与 bat 同目录），用记事本把第一行改成你的公司全称、第二行改成 18 位税号。
+之后每次扫描都会自动核对抬头与税号，开错的发票会被单独标红提示；
+不放置该文件也完全能用，只是跳过抬头校验。
+
 ### 3. 命令行
 
 ```bash
@@ -277,6 +282,8 @@ A：`fapiao fetch` 只用 Python 标准库 `imaplib` 连接你自己填写的 IM
 
 ```
 fapiao-vault/
+├── 一键整理发票.bat        # Windows 双击/拖拽入口
+├── 报销配置.example.txt    # 抬头校验配置模板（复制为 报销配置.txt 生效）
 ├── src/fapiao_vault/
 │   ├── models.py          # Invoice 数据模型（金额用 Decimal）
 │   ├── fields.py          # 字段抽取：三种文本视图 + 版式规则
