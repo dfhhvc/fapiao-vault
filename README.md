@@ -209,7 +209,7 @@ _归档/
 python -m unittest discover -s tests
 ```
 
-**102 个测试，零测试依赖**（只用标准库 `unittest`），覆盖：
+**103 个测试，零测试依赖**（只用标准库 `unittest`），覆盖：
 
 - 统一社会信用代码校验位（含**手工验算**的样例，不循环自证）
 - 中文大写金额解析（元/角/分、万、拾 的边界）
@@ -267,7 +267,7 @@ fapiao-vault/
 │   ├── archive.py         # 归档重命名
 │   ├── report.py          # HTML / Excel / CSV / JSON 报表
 │   └── cli.py             # 命令行入口
-├── tests/                 # 102 个单元测试（标准库 unittest）
+├── tests/                 # 103 个单元测试（标准库 unittest）
 ├── tools/make_fixtures.py # 合成测试样例生成器
 ├── samples/               # 生成的测试样例
 └── docs/                  # logo 与 README 演示图

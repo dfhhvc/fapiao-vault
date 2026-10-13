@@ -10,6 +10,19 @@ from tools import make_fixtures
 from fapiao_vault.parsers import parse_file
 from fapiao_vault.pipeline import scan_directory
 
+try:
+    import pypdf  # noqa: F401
+
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
+# 样品集中 3 张有效票是 PDF：无 pypdf 时这些测试跳过（与 test_write_xlsx_or_skip
+# 对 openpyxl 的处理一致），由 CI 的 core-only job 守护零依赖承诺。
+requires_pypdf = unittest.skipUnless(
+    HAS_PYPDF, '需要可选依赖 pypdf（pip install "fapiao-vault[pdf]"）'
+)
+
 
 class TestParsers(unittest.TestCase):
     @classmethod
@@ -24,6 +37,7 @@ class TestParsers(unittest.TestCase):
 
     # ---------- PDF ----------
 
+    @requires_pypdf
     def test_pdf_text_layer(self):
         inv = parse_file(self.dir / "01_数电票_出租车_42.50元.pdf")
         self.assertEqual(inv.file_format, "pdf")
@@ -92,8 +106,17 @@ class TestParsers(unittest.TestCase):
         self.assertTrue(len(a.file_sha256) == 64)
         self.assertEqual(a.file_sha256, b.file_sha256)
 
+    # ---------- 零依赖降级（core-only CI 的核心守护点） ----------
+
+    @unittest.skipIf(HAS_PYPDF, "已安装 pypdf，降级路径无需验证")
+    def test_pdf_without_pypdf_gives_hint(self):
+        inv = parse_file(self.dir / "01_数电票_出租车_42.50元.pdf")
+        self.assertTrue(any("未安装 pypdf" in i for i in inv.issues))
+        self.assertEqual(inv.confidence, "low")
+
     # ---------- 流水线 ----------
 
+    @requires_pypdf
     def test_scan_directory(self):
         result = scan_directory(self.dir)
         self.assertEqual(result.scanned_count, 7)
@@ -102,6 +125,7 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(len(result.duplicates), 1)
         self.assertEqual(result.duplicates[0].uid, "25117000000000000001")
 
+    @requires_pypdf
     def test_scan_with_company_check(self):
         result = scan_directory(
             self.dir,

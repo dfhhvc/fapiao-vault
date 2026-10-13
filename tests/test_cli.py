@@ -11,6 +11,19 @@ from tools import make_fixtures
 
 from fapiao_vault.cli import main
 
+try:
+    import pypdf  # noqa: F401
+
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
+# 归档数量与跨期重号断言依赖 PDF 样品被解析：无 pypdf 时跳过（与
+# test_write_xlsx_or_skip 对 openpyxl 的处理一致），CI core-only job 守护零依赖承诺。
+requires_pypdf = unittest.skipUnless(
+    HAS_PYPDF, '需要可选依赖 pypdf（pip install "fapiao-vault[pdf]"）'
+)
+
 
 def run_cli(argv):
     buf = io.StringIO()
@@ -57,6 +70,7 @@ class TestCli(unittest.TestCase):
             _, out = run_cli(["scan", str(self.dir), "--out", out_dir, "--no-auto-history"])
             self.assertIn("重复发票", out)
 
+    @requires_pypdf
     def test_scan_with_archive(self):
         with tempfile.TemporaryDirectory() as out_dir, tempfile.TemporaryDirectory() as arch:
             code, out = run_cli(
@@ -75,6 +89,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("已归档 5 个文件", out)
             self.assertTrue(list(Path(arch).rglob("*.pdf")))
 
+    @requires_pypdf
     def test_scan_with_cross_period_history(self):
         # 历史台账月份不同 → CLI 必须把跨期重号显示出来（历史版本算完不显示，静默失效）
         with tempfile.TemporaryDirectory() as out_dir, tempfile.TemporaryDirectory() as hd:

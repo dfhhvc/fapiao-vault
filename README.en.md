@@ -178,7 +178,7 @@ The only writes go to your output directories (`_报表/` and `_归档/`).
 python -m unittest discover -s tests
 ```
 
-**102 tests, zero test dependencies** (standard-library `unittest` only), covering:
+**103 tests, zero test dependencies** (standard-library `unittest` only), covering:
 
 - USCC check digits (with **hand-computed** vectors, not self-referential)
 - Chinese uppercase amount parsing (yuan/jiao/fen, 万, 拾 boundaries)

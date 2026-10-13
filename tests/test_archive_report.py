@@ -13,6 +13,20 @@ from fapiao_vault.models import Invoice
 from fapiao_vault.pipeline import scan_directory
 from fapiao_vault.report import build_summary, write_csv, write_html, write_json, write_xlsx
 
+try:
+    import pypdf  # noqa: F401
+
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
+# 汇总数字 / HTML 内容 / 归档数量 / 跨期重号断言依赖 PDF 样品被解析：
+# 无 pypdf 时跳过（与 test_write_xlsx_or_skip 对 openpyxl 的处理一致），
+# 由 CI 的 core-only job 守护零依赖承诺。
+requires_pypdf = unittest.skipUnless(
+    HAS_PYPDF, '需要可选依赖 pypdf（pip install "fapiao-vault[pdf]"）'
+)
+
 
 class TestSanitize(unittest.TestCase):
     def test_removes_illegal_chars(self):
@@ -81,6 +95,7 @@ class TestReport(unittest.TestCase):
     def tearDownClass(cls):
         cls._tmp.cleanup()
 
+    @requires_pypdf
     def test_summary_totals(self):
         t = self.summary["totals"]
         self.assertEqual(t["scanned"], 7)
@@ -96,6 +111,7 @@ class TestReport(unittest.TestCase):
         months = {m["key"] for m in self.summary["by_month"]}
         self.assertIn("2026-09", months)
 
+    @requires_pypdf
     def test_write_json_roundtrip(self):
         with tempfile.TemporaryDirectory() as d:
             p = write_json(self.summary, Path(d) / "s.json")
@@ -111,6 +127,7 @@ class TestReport(unittest.TestCase):
             self.assertIn("发票号码", text)
             self.assertEqual(len(text.strip().splitlines()), 1 + 7)
 
+    @requires_pypdf
     def test_write_html_self_contained(self):
         with tempfile.TemporaryDirectory() as d:
             p = write_html(self.summary, Path(d) / "r.html")
@@ -161,6 +178,7 @@ class TestReport(unittest.TestCase):
             self.assertEqual(len(history), len(unique_uids))
             self.assertIn("2026-09", set(history.values()))
 
+    @requires_pypdf
     def test_scan_with_history_flags_cross_period(self):
         # 历史台账月份与本次不同 → 命中，且发票被写入问题标记
         with tempfile.TemporaryDirectory() as d:
@@ -188,6 +206,7 @@ class TestReport(unittest.TestCase):
 
 
 class TestArchive(unittest.TestCase):
+    @requires_pypdf
     def test_archive_copies_files(self):
         with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
             src_dir = Path(src)
