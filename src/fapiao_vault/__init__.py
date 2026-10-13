@@ -7,5 +7,5 @@
 3. 最小依赖：OFD 与 XML 解析仅用标准库；PDF 解析可选依赖 pypdf。
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = ["__version__"]

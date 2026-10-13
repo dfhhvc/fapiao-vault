@@ -3,6 +3,7 @@
 用法：
     fapiao scan  <目录>           扫描并生成报表
     fapiao scan  <目录> --archive 扫描 + 归档重命名
+    fapiao fetch --host ...       从 IMAP 邮箱抓取发票附件（可选联网功能）
     fapiao verify <统一社会信用代码>  校验税号
     fapiao version
 """
@@ -10,12 +11,14 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import os
 import sys
 from pathlib import Path
 
 from . import __version__
 from .archive import archive_invoices
+from .mail_fetch import MailFetchError, fetch_invoices
 from .pipeline import scan_directory
 from .report import build_summary, write_csv, write_html, write_json, write_xlsx
 from .validate import validate_tax_id
@@ -177,6 +180,75 @@ def cmd_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- fetch
+
+
+def cmd_fetch(args: argparse.Namespace) -> int:
+    dest = Path(args.dir).expanduser().resolve()
+    if args.password_env:
+        password = os.environ.get(args.password_env, "")
+        if not password:
+            print(red(f"环境变量 {args.password_env} 未设置或为空"))
+            return 2
+    else:
+        password = getpass.getpass("邮箱授权码（输入不回显）：")
+
+    print(bold("FapiaoVault 邮件抓取（IMAP）"))
+    print(
+        dim(f"  服务器  {args.host}:{args.port}{'（SSL）' if args.ssl else '（无 SSL，不建议）'}")
+    )
+    print(dim(f"  账户    {args.user}"))
+    scope = f"  范围    {args.folder} 最近 {args.since} 天"
+    if args.limit:
+        scope += f"，最多 {args.limit} 封"
+    print(dim(scope))
+    print(dim(f"  保存到  {dest}"))
+    print(_rule())
+
+    def on_progress(done: int, total: int) -> None:
+        print(f"\r  已处理 {done}/{total} 封", end="", flush=True)
+
+    try:
+        result = fetch_invoices(
+            args.host,
+            args.user,
+            password,
+            dest,
+            port=args.port,
+            use_ssl=args.ssl,
+            folder=args.folder,
+            since_days=args.since,
+            limit=args.limit,
+            on_progress=on_progress,
+        )
+    except MailFetchError as exc:
+        print()
+        print(red(f"抓取失败：{exc}"))
+        return 1
+
+    print()  # 结束进度行
+    print()
+    print(f"  命中邮件        {result.matched} 封（处理 {result.processed} 封）")
+    print(f"  新下载附件      {green(str(len(result.saved)))} 个")
+    print(f"  已存在跳过      {result.skipped} 个")
+    print(f"  无发票附件      {result.non_invoice} 封")
+    for path in result.saved[:10]:
+        print(dim(f"        - {Path(path).name}"))
+    if len(result.saved) > 10:
+        print(dim(f"        ...另有 {len(result.saved) - 10} 个"))
+    for err in result.errors[:10]:
+        print(yellow(f"  ! {err}"))
+
+    print()
+    print(bold("下一步"))
+    print(f"  整理查重  {green(f'fapiao scan {dest}')}")
+
+    if result.errors:
+        print(yellow(f"\n注意：{len(result.errors)} 封邮件处理失败，可重跑一次补抓。"))
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------- verify
 
 
@@ -234,6 +306,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_verify = sub.add_parser("verify", help="校验统一社会信用代码 / 纳税人识别号")
     p_verify.add_argument("code", help="18 位统一社会信用代码或 15 位旧税号")
     p_verify.set_defaults(func=cmd_verify)
+
+    p_fetch = sub.add_parser("fetch", help="从 IMAP 邮箱抓取发票附件到本地（可选联网功能）")
+    p_fetch.add_argument("--host", required=True, help="IMAP 服务器，如 imap.qq.com / imap.163.com")
+    p_fetch.add_argument("--user", required=True, help="邮箱账户")
+    p_fetch.add_argument("--dir", required=True, help="附件保存目录")
+    p_fetch.add_argument("--port", type=int, default=993, help="服务器端口（默认 993）")
+    p_fetch.add_argument(
+        "--no-ssl", dest="ssl", action="store_false", help="不使用 SSL（默认全程 SSL）"
+    )
+    p_fetch.add_argument("--folder", default="INBOX", help="邮箱文件夹（默认 INBOX）")
+    p_fetch.add_argument("--since", type=int, default=90, help="只抓最近 N 天的邮件（默认 90）")
+    p_fetch.add_argument("--limit", type=int, default=0, help="最多处理 N 封邮件（0 = 不限）")
+    p_fetch.add_argument(
+        "--password-env",
+        help="存放授权码的环境变量名（不指定则交互式输入，避免授权码进入 shell 历史）",
+    )
+    p_fetch.set_defaults(func=cmd_fetch)
 
     p_version = sub.add_parser("version", help="显示版本")
     p_version.set_defaults(func=lambda a: (print(f"fapiao-vault {__version__}"), 0)[1])

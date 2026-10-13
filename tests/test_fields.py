@@ -238,5 +238,105 @@ class TestExtractFromText(unittest.TestCase):
         self.assertEqual(inv.total, Decimal("42.50"))
 
 
+# 版式三：铁路电子客票（国家税务总局公告 2024 年第 8 号，2024-11 起全国推广）。
+# 与普通数电票的关键差异：票面【无销售方区块】，但有「旅客身份证件信息」
+# 和「行程信息」两个普通发票没有的版块——历史上它们曾干扰名称/税号抽取。
+# （以下票面按公告字段规格构造，数据虚构。）
+RAILWAY_SAMPLE = """电子发票（铁路电子客票）
+发票号码：25117000000000000021
+开票日期：2026年09月15日
+购买方信息
+名称：测试用科技有限公司
+统一社会信用代码/纳税人识别号：91330100MA2TETX11W
+旅客身份证件信息
+姓名：张三
+证件号码：3301**********1234
+行程信息
+车次：G1025 出发站：杭州东 到达站：上海虹桥
+出发日期：2026年09月20日
+*运输服务*客运服务费 张 1 290.37 290.37 9% 26.13
+合 计 ¥290.37 ¥26.13
+价税合计（大写）叁佰壹拾陆元伍角整 （小写）¥316.50
+"""
+
+# 版式四：航空运输电子客票行程单（数电票票种，同样无销售方区块）
+AIR_SAMPLE = """电子发票（航空运输电子客票行程单）
+发票号码：25117000000000000022
+开票日期：2026年09月16日
+购买方信息
+名称：测试用科技有限公司
+统一社会信用代码/纳税人识别号：91330100MA2TETX11W
+旅客身份证件信息
+姓名：张三
+证件号码：3301**********1234
+行程信息
+航班号：MU5137 出发日期：2026年09月21日
+出发站：杭州 到达站：北京
+*运输服务*客运服务费 张 1 1090.91 1090.91 9% 109.09
+合 计 ¥1090.91 ¥109.09
+价税合计（大写）壹仟贰佰元整 （小写）¥1200.00
+"""
+
+# 版式五：铁路电子客票简版——无明细行、无大写金额，用「票价」行替代
+# 「价税合计（小写）」。total 必须由 金额+税额 反推（报销场景高频版式）。
+RAILWAY_SIMPLE_SAMPLE = """电子发票（铁路电子客票）
+发票号码：25117000000000000023
+开票日期：2026年09月17日
+购买方信息
+名称：测试用科技有限公司
+统一社会信用代码/纳税人识别号：91330100MA2TETX11W
+旅客身份证件信息
+姓名：李四
+行程信息
+车次：D3101 出发站：杭州东 到达站：南京南
+票价：¥220.00
+合 计 ¥201.83 ¥18.17
+"""
+
+
+class TestTravelTicketTypes(unittest.TestCase):
+    """报销高频票种：铁路电子客票 / 航空行程单（数电票体系，无销售方区块）。"""
+
+    def test_railway_ticket_layout(self):
+        inv = extract_from_text(RAILWAY_SAMPLE)
+        self.assertIn("铁路电子客票", inv.invoice_type)
+        self.assertEqual(inv.invoice_number, "25117000000000000021")
+        self.assertEqual(inv.invoice_date, "2026-09-15")
+        self.assertEqual(inv.buyer_name, "测试用科技有限公司")
+        self.assertEqual(inv.buyer_tax_id, "91330100MA2TETX11W")
+        # 票面无销售方区块：seller 必须为空且【不误报】（历史上曾把行程信息吞成销售方）
+        self.assertEqual(inv.seller_name, "")
+        self.assertEqual(inv.seller_tax_id, "")
+        self.assertEqual(inv.total, Decimal("316.50"))
+        self.assertEqual(inv.amount, Decimal("290.37"))
+        self.assertEqual(inv.tax, Decimal("26.13"))
+        self.assertEqual(inv.items, ["*运输服务*客运服务费"])
+        self.assertEqual(inv.issues, [])
+
+    def test_air_itinerary_layout(self):
+        inv = extract_from_text(AIR_SAMPLE)
+        self.assertIn("航空运输电子客票行程单", inv.invoice_type)
+        self.assertEqual(inv.invoice_number, "25117000000000000022")
+        self.assertEqual(inv.invoice_date, "2026-09-16")
+        self.assertEqual(inv.buyer_name, "测试用科技有限公司")
+        self.assertEqual(inv.seller_name, "")
+        self.assertEqual(inv.total, Decimal("1200.00"))
+        self.assertEqual(inv.amount, Decimal("1090.91"))
+        self.assertEqual(inv.tax, Decimal("109.09"))
+        self.assertEqual(inv.issues, [])
+
+    def test_railway_simple_layout_derives_total(self):
+        inv = extract_from_text(RAILWAY_SIMPLE_SAMPLE)
+        self.assertIn("铁路电子客票", inv.invoice_type)
+        # 无「价税合计」行：total 由 金额+税额 反推
+        self.assertEqual(inv.total, Decimal("220.00"))
+        self.assertEqual(inv.amount, Decimal("201.83"))
+        self.assertEqual(inv.tax, Decimal("18.17"))
+        # 无 *类别*品名 明细行：品名为空但不得误抽行程/证件信息
+        self.assertEqual(inv.items, [])
+        self.assertEqual(inv.seller_name, "")
+        self.assertEqual(inv.issues, [])
+
+
 if __name__ == "__main__":
     unittest.main()

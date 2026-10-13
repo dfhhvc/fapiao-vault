@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fapiao-vault"
-version = "1.0.0"
+version = "1.1.0"
 description = "纯本地电子发票整理、查重与报销汇总工具。不联网、不上传、不依赖 AI/OCR。"
 readme = "README.md"
 requires-python = ">=3.9"

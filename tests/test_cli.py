@@ -3,13 +3,14 @@
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
 from tools import make_fixtures
 
-from fapiao_vault.cli import main
+from fapiao_vault.cli import build_parser, cmd_fetch, main
 
 try:
     import pypdf  # noqa: F401
@@ -128,6 +129,66 @@ class TestCli(unittest.TestCase):
         code, out = run_cli(["version"])
         self.assertEqual(code, 0)
         self.assertIn("fapiao-vault", out)
+
+
+class TestFetchCli(unittest.TestCase):
+    """fetch 子命令的本地测试：只测参数接线与失败前置，绝不联网。"""
+
+    def test_fetch_parser_defaults_and_flags(self):
+        parser = build_parser()
+        args = parser.parse_args(
+            ["fetch", "--host", "imap.qq.com", "--user", "a@qq.com", "--dir", "./收件箱"]
+        )
+        self.assertIs(args.func, cmd_fetch)
+        self.assertTrue(args.ssl)
+        self.assertEqual(args.port, 993)
+        self.assertEqual(args.folder, "INBOX")
+        self.assertEqual(args.since, 90)
+        self.assertEqual(args.limit, 0)
+
+        args2 = parser.parse_args(
+            [
+                "fetch",
+                "--host",
+                "h",
+                "--user",
+                "u",
+                "--dir",
+                "d",
+                "--no-ssl",
+                "--since",
+                "30",
+                "--limit",
+                "5",
+                "--folder",
+                "Sent",
+            ]
+        )
+        self.assertFalse(args2.ssl)
+        self.assertEqual(args2.since, 30)
+        self.assertEqual(args2.limit, 5)
+        self.assertEqual(args2.folder, "Sent")
+
+    def test_fetch_missing_password_env_fails_before_network(self):
+        # 授权码环境变量未设置时，必须在发起任何网络连接之前就失败
+        env_name = "FAPIAO_VAULT_TEST_MISSING_PW"
+        os.environ.pop(env_name, None)
+        with tempfile.TemporaryDirectory() as d:
+            code, out = run_cli(
+                [
+                    "fetch",
+                    "--host",
+                    "imap.example.invalid",
+                    "--user",
+                    "a@b.c",
+                    "--dir",
+                    d,
+                    "--password-env",
+                    env_name,
+                ]
+            )
+            self.assertEqual(code, 2)
+            self.assertIn("未设置或为空", out)
 
 
 if __name__ == "__main__":
