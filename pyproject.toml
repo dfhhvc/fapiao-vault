@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fapiao-vault"
+version = "1.1.0"
+description = "纯本地电子发票整理、查重与报销汇总工具。不联网、不上传、不依赖 AI/OCR。"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "dfhhvc" }]
+keywords = ["fapiao", "invoice", "china", "reimbursement", "ofd", "数电票", "电子发票", "报销"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Natural Language :: Chinese (Simplified)",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# PDF 解析（唯一可选依赖；OFD / XML 用标准库即可解析）
+pdf = ["pypdf>=4.0"]
+# Excel 导出（不装则自动降级为 CSV）
+excel = ["openpyxl>=3.1"]
+
+[project.scripts]
+fapiao = "fapiao_vault.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E4/E7/E9: pyflakes/pycodestyle 错误级; F: pyflakes; W: pycodestyle 警告
+# I: import 排序; UP: pyupgrade; RUF: ruff 专属规则
+select = ["E4", "E7", "E9", "F", "W", "I", "UP", "RUF"]
+# 中文项目：全角标点（（），、：）是刻意为之，RUF001/002/003 属误报
+ignore = ["RUF001", "RUF002", "RUF003"]
